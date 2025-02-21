@@ -1,0 +1,25 @@
+<h2>EV Fleet Telemetry</h2>
+
+<!-- Google Map Container -->
+<div class="map-container">
+  <google-map height="500px" width="100%" [zoom]="12" [center]="mapCenter">
+    <ng-container *ngFor="let vehicle of vehicles">
+      <map-marker 
+        [position]="vehicle.location" 
+        [label]="'🚗 ' + vehicle.id"
+        [icon]="getMarkerIcon(vehicle)">
+      </map-marker>
+    </ng-container>
+  </google-map>
+</div>
+
+<!-- Vehicle Grid -->
+<div class="grid-container">
+  <div *ngFor="let vehicle of vehicles" class="vehicle-card" [class.low-battery]="vehicle.battery < 30">
+    <h3>Vehicle {{ vehicle.id }}</h3>
+    <p>🚗 Speed: {{ vehicle.speed.toFixed(1) }} km/h</p>
+    <p>🔋 Battery: {{ vehicle.battery.toFixed(1) }}%</p>
+    <p>📍 Location: Lat {{ vehicle.location.lat.toFixed(5) }}, Lng {{ vehicle.location.lng.toFixed(5) }}</p>
+    <p class="warning" *ngIf="vehicle.battery < 30">⚠️ WARNING: Low Battery!</p>
+  </div>
+</div>

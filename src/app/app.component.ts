@@ -1,12 +1,14 @@
 import { Component } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { DashboardComponent } from './components/dashboard/dashboard.component'; // ✅ Import it
+import { GoogleMapsModule } from '@angular/google-maps';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet],
+  standalone: true, // ✅ Ensure it's standalone
   templateUrl: './app.component.html',
-  styleUrl: './app.component.css'
+  styleUrls: ['./app.component.css'],
+  imports: [DashboardComponent, GoogleMapsModule] // ✅ Add DashboardComponent here
 })
 export class AppComponent {
-  title = 'my-angular-app';
+  title = 'EV Fleet Dashboard';
 }
