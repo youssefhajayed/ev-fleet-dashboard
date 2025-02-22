@@ -1,6 +1,10 @@
 import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common'; 
+import { Store } from '@ngrx/store';
+import { VehicleState } from '../../state/vehicle.reducer';
+import { Observable } from 'rxjs';
+import { Vehicle } from '../../models/vehicle.model';
 import { GoogleMapsModule } from '@angular/google-maps';
+import { CommonModule } from '@angular/common';
 import { WebSocketService } from '../../services/websocket.service';
 
 @Component({
@@ -8,49 +12,58 @@ import { WebSocketService } from '../../services/websocket.service';
   standalone: true,
   imports: [CommonModule, GoogleMapsModule],
   templateUrl: './dashboard.component.html',
-  styleUrls: ['./dashboard.component.css']
+  styleUrls: ['./dashboard.component.css'],
+  providers: [WebSocketService] // ✅ Ensure service is provided
 })
 export class DashboardComponent {
-  vehicles: any[] = [];
-  mapCenter = { lat: 48.8566, lng: 2.3522 };
+  vehicles$: Observable<{ [id: number]: Vehicle }>;
+  mapCenter = { lat: 48.8566, lng: 2.3522 }; // Default center (Paris)
+  private isFirstLoad = true; // ✅ Track if this is the first load
 
-  constructor(private wsService: WebSocketService) {}
-
-  ngOnInit() {
-    this.wsService.getTelemetryData().subscribe({
-      next: (data) => {
-        console.log('📥 Received Data:', data);
-        this.vehicles = [...data]; 
-        this.updateMapCenter();
-      },
-      error: (err) => console.error('❌ WebSocket Error:', err)
+  constructor(private store: Store<{ vehicles: VehicleState }>, private wsService: WebSocketService) {
+    
+    console.log('🟡 Subscribing to Vehicles State');
+    this.vehicles$ = store.select(state => {
+      console.log('🚀 Vehicles in Store:', state.vehicles.vehicles);
+      return state.vehicles.vehicles;
     });
   }
 
-  private updateMapCenter() {
-    if (this.vehicles.length === 0) return;
+  ngOnInit() {
+    this.vehicles$.subscribe(vehicles => {
+      const vehicleList = Object.values(vehicles);
+      if (vehicleList.length > 0 && this.isFirstLoad) {
+        this.centerMapOnVehicles(vehicleList);
+        this.isFirstLoad = false;
+      }
+    });
+  }
 
+  private centerMapOnVehicles(vehicles: Vehicle[]) {
     let sumLat = 0, sumLng = 0;
-    this.vehicles.forEach(vehicle => {
+    vehicles.forEach(vehicle => {
       sumLat += vehicle.location.lat;
       sumLng += vehicle.location.lng;
     });
 
     this.mapCenter = {
-      lat: sumLat / this.vehicles.length,
-      lng: sumLng / this.vehicles.length
+      lat: sumLat / vehicles.length,
+      lng: sumLng / vehicles.length
     };
-
-    console.log('📍 Map Center Updated:', this.mapCenter);
   }
 
-  getMarkerIcon(vehicle: any): string {
-    if (vehicle.battery > 70) {
-      return 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'; // High battery = Green
-    } else if (vehicle.battery > 30) {
-      return 'http://maps.google.com/mapfiles/ms/icons/yellow-dot.png'; // Medium battery = Yellow
-    } else {
-      return 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'; // Low battery = Red
-    }
+  getUniqueMarkerIcon(vehicleId: number): google.maps.Icon {
+    const vehicleIcons = [
+      'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+      'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+      'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
+      'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
+      'https://maps.google.com/mapfiles/ms/icons/purple-dot.png'
+    ];
+
+    return {
+      url: vehicleIcons[vehicleId % vehicleIcons.length], 
+      scaledSize: new google.maps.Size(40, 40), 
+    };
   }
 }

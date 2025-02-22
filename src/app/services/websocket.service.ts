@@ -1,65 +1,85 @@
 import { Injectable } from '@angular/core';
-import { Observable, interval, Subject } from 'rxjs';
+import { interval } from 'rxjs';
+import { Store } from '@ngrx/store';
+import { updateVehicle, initializeVehicles } from '../state/vehicle.actions';
+import { Vehicle } from '../models/vehicle.model';
 
 @Injectable({
   providedIn: 'root'
 })
 export class WebSocketService {
-  private dataStream$: Subject<any> = new Subject();
-  private vehiclePositions: { [key: number]: { lat: number, lng: number } } = {}; // Store vehicle positions
+  private vehiclePositions: { [key: number]: { lat: number, lng: number } } = {};
 
-  constructor() {
+  constructor(private store: Store) {
+    console.log('wesocket construct');
     this.initializeVehicles();
     this.startSimulatingData();
   }
 
   private initializeVehicles() {
+    const vehicles: Vehicle[] = [];
+    console.log('initializing vehicles');
+
     for (let i = 1; i <= 10; i++) {
-      this.vehiclePositions[i] = { 
-        lat: 48.8566 + Math.random() * 0.01, 
-        lng: 2.3522 + Math.random() * 0.01 
+      const position = {
+        lat: 48.8566 + Math.random() * 0.01,
+        lng: 2.3522 + Math.random() * 0.01
       };
+      this.vehiclePositions[i] = position;
+      
+      vehicles.push({
+        id: i,
+        speed: Math.floor(Math.random() * 100),
+        battery: 100,
+        temperature: Math.floor(Math.random() * (90 - 20 + 1)) + 20,
+        tirePressure: Math.floor(Math.random() * (40 - 30 + 1)) + 30,
+        motorEfficiency: Math.floor(Math.random() * (100 - 70 + 1)) + 70,
+        regenBraking: Math.random() > 0.5,
+        brakeWear: Math.floor(Math.random() * 100),
+        energyConsumption: Math.floor(Math.random() * (20 - 5 + 1)) + 5,
+        mileage: Math.floor(Math.random() * 100000),
+        lidarStatus: Math.random() > 0.1,
+        radarStatus: Math.random() > 0.1,
+        cameraStatus: Math.random() > 0.1,
+        autopilotMode: Math.random() > 0.5,
+        location: position
+      });
     }
+    console.log('📡 Sending Vehicles Data:', vehicles);
+    this.store.dispatch(initializeVehicles({ vehicles }));
   }
 
   private startSimulatingData() {
     interval(2000).subscribe(() => {
-      const simulatedData = this.generateVehicleData();
-      console.log('📡 Sending Simulated Data:', simulatedData);
-      this.dataStream$.next(simulatedData);
+      for (let i = 1; i <= 10; i++) {
+        let position = { ...this.vehiclePositions[i] };
+
+        position.lat += (Math.random() - 0.5) * 0.001;
+        position.lng += (Math.random() - 0.5) * 0.001;
+
+        const updatedVehicle: Vehicle = {
+          id: i,
+          speed: Math.floor(Math.random() * 100),
+          battery: Math.floor(Math.max(0, 100 - Math.random() * 40)),
+          temperature: Math.floor(Math.random() * (90 - 20 + 1)) + 20,
+          tirePressure: Math.floor(Math.random() * (40 - 30 + 1)) + 30,
+          motorEfficiency: Math.floor(Math.random() * (100 - 70 + 1)) + 70,
+          regenBraking: Math.random() > 0.5,
+          brakeWear: Math.floor(Math.random() * 100),
+          energyConsumption: Math.floor(Math.random() * (20 - 5 + 1)) + 5,
+          mileage: Math.floor(Math.random() * 100000),
+          lidarStatus: Math.random() > 0.1,
+          radarStatus: Math.random() > 0.1,
+          cameraStatus: Math.random() > 0.1,
+          autopilotMode: Math.random() > 0.5,
+          location: position
+        };
+
+        // ✅ Store the new position to maintain consistent state
+        this.vehiclePositions[i] = position;
+        console.log('📡 Sending Simulated Data:', updatedVehicle);
+        this.store.dispatch(updateVehicle({ vehicle: updatedVehicle }));
+      }
     });
-  }
-
-  private generateVehicleData() {
-    return Array.from({ length: 10 }, (_, i) => {
-      const id = i + 1;
-      let position = this.vehiclePositions[id];
-
-      // Simulate small movements
-      position.lat += (Math.random() - 0.5) * 0.0005;
-      position.lng += (Math.random() - 0.5) * 0.0005;
-      this.vehiclePositions[id] = position;
-
-      return {
-        id,
-        speed: Math.floor(Math.random() * 100), 
-        battery: Math.max(0, 100 - Math.random() * 5), 
-        location: { lat: position.lat, lng: position.lng }
-      };
-    });
-  }
-
-  public getTelemetryData(): Observable<any> {
-    return this.dataStream$.asObservable();
-  }
-
-  getMarkerIcon(vehicle: any): string {
-    if (vehicle.battery > 70) {
-      return 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'; // High battery = Green
-    } else if (vehicle.battery > 30) {
-      return 'http://maps.google.com/mapfiles/ms/icons/yellow-dot.png'; // Medium battery = Yellow
-    } else {
-      return 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'; // Low battery = Red
-    }
   }
 }

@@ -13,15 +13,24 @@ export const initialState: VehicleState = {
 export const vehicleReducer = createReducer(
   initialState,
 
+  // Debug initializeVehicles
   on(initializeVehicles, (state, { vehicles }) => {
+    console.log('✅ Reducer: Initializing Vehicles', vehicles);
+
     const vehicleMap = vehicles.reduce((map, vehicle) => {
       map[vehicle.id] = vehicle;
       return map;
     }, {} as { [id: number]: Vehicle });
+
+    console.log('✅ New State:', { vehicles: vehicleMap });
+
     return { vehicles: vehicleMap };
   }),
 
+  // Debug updateVehicle
   on(updateVehicle, (state, { vehicle }) => {
+    console.log('🚀 Reducer: Updating Vehicle', vehicle);
+
     const existingVehicle = state.vehicles[vehicle.id];
 
     return {
