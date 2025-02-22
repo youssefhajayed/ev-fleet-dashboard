@@ -11,14 +11,14 @@ export class WebSocketService {
   private vehiclePositions: { [key: number]: { lat: number, lng: number } } = {};
 
   constructor(private store: Store) {
-    console.log('wesocket construct');
+ 
     this.initializeVehicles();
     this.startSimulatingData();
   }
 
   private initializeVehicles() {
     const vehicles: Vehicle[] = [];
-    console.log('initializing vehicles');
+   
 
     for (let i = 1; i <= 10; i++) {
       const position = {
@@ -45,7 +45,7 @@ export class WebSocketService {
         location: position
       });
     }
-    console.log('📡 Sending Vehicles Data:', vehicles);
+   
     this.store.dispatch(initializeVehicles({ vehicles }));
   }
 
@@ -54,7 +54,7 @@ export class WebSocketService {
       for (let i = 1; i <= 10; i++) {
         let position = { ...this.vehiclePositions[i] };
 
-        position.lat += (Math.random() - 0.5) * 0.001;
+        position.lat += (Math.random() - 0.5) * 0.001;  
         position.lng += (Math.random() - 0.5) * 0.001;
 
         const updatedVehicle: Vehicle = {
@@ -77,7 +77,7 @@ export class WebSocketService {
 
         // ✅ Store the new position to maintain consistent state
         this.vehiclePositions[i] = position;
-        console.log('📡 Sending Simulated Data:', updatedVehicle);
+       
         this.store.dispatch(updateVehicle({ vehicle: updatedVehicle }));
       }
     });

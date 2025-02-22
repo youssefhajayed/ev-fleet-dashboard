@@ -18,7 +18,7 @@
 <!-- Vehicle Grid -->
 <div class="grid-container">
   <ng-container *ngIf="vehicles$ | async as vehicles">
-    <div *ngFor="let vehicle of vehicles | keyvalue" 
+    <div *ngFor="let vehicle of vehicles |  keyvalue : vehicleOrder" 
          class="vehicle-card" 
          [class.low-battery]="vehicle.value.battery < 30">
       <h3>🚗 Vehicle {{ vehicle.value.id }}</h3>

@@ -51,7 +51,9 @@ export class DashboardComponent {
       lng: sumLng / vehicles.length
     };
   }
-
+  vehicleOrder = (a: any, b: any) => {
+    return Number(a.key) - Number(b.key); // Convert keys to numbers and sort
+  };
   getUniqueMarkerIcon(vehicleId: number): google.maps.Icon {
     const vehicleIcons = [
       'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
@@ -66,4 +68,5 @@ export class DashboardComponent {
       scaledSize: new google.maps.Size(40, 40), 
     };
   }
+
 }
