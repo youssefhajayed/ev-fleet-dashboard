@@ -26,17 +26,35 @@
     box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
     background-color: white;
     transition: background-color 0.5s ease-in-out;
+     /* Set max height to allow scrolling */
+     max-height: 300px; /* Adjust as needed */
+    
+     /* Enable scrolling */
+     overflow-y: auto;
+    
   }
 
     /* Highlight vehicles with low battery */
     .low-battery {
         background-color: #ffcccc; /* Light red background */
-        border-left: 5px solid red;
+        border-left: 5px solid rgb(255, 242, 0);
       }
       
       /* Style for the warning message */
       .warning {
-        color: red;
+        color: rgb(255, 242, 0);
+        font-weight: bold;
+        text-align: center;
+      }
+
+      .critical-battery {
+        background-color: #ffcccc; /* Light red background */
+        border-left: 5px solid rgb(255, 0, 0);
+      }
+      
+      /* Style for the warning message */
+      .criticalWarning {
+        color: rgb(255, 4, 0);
         font-weight: bold;
         text-align: center;
       }

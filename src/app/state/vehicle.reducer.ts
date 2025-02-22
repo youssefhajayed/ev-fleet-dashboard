@@ -7,7 +7,7 @@ export interface VehicleState {
 }
 
 export const initialState: VehicleState = {
-  vehicles: {}
+  vehicles: {},
 };
 
 export const vehicleReducer = createReducer(
@@ -29,20 +29,21 @@ export const vehicleReducer = createReducer(
 
   // Debug updateVehicle
   on(updateVehicle, (state, { vehicle }) => {
-    console.log('🚀 Reducer: Updating Vehicle', vehicle);
-
     const existingVehicle = state.vehicles[vehicle.id];
-
+  
     return {
       vehicles: {
         ...state.vehicles,
         [vehicle.id]: {
+          // If we want to keep the rest of the old vehicle's fields
+          ...existingVehicle,
+          // Overwrite them with what's in the action
           ...vehicle,
-          battery: existingVehicle
-            ? Math.min(existingVehicle.battery, vehicle.battery) // Battery cannot increase
-            : vehicle.battery
-        }
-      }
+  
+          // (Optional) clamp if you never want battery below 0 or above 100
+          battery: Math.min(100, Math.max(0, vehicle.battery)),
+        },
+      },
     };
   })
 );

@@ -5,10 +5,19 @@
   <google-map height="500px" width="100%" [zoom]="12" [center]="mapCenter">
     <ng-container *ngIf="vehicles$ | async as vehicles">
       <ng-container *ngFor="let vehicle of vehicles | keyvalue">
-        <map-marker 
-          [position]="vehicle.value.location" 
-          [label]="'🚗 ' + vehicle.value.id"
-          [icon]="getUniqueMarkerIcon(vehicle.value.id)">
+        <map-marker
+          [position]="vehicle.value.location"
+          [label]="
+            vehicle.value.headingToStation
+              ? '⚡' + vehicle.value.id
+              : '🚗 ' + vehicle.value.id
+          "
+          [icon]="
+            vehicle.value.headingToStation
+              ? '⚡'
+              : '🚗 '
+          "
+        >
         </map-marker>
       </ng-container>
     </ng-container>
@@ -18,25 +27,42 @@
 <!-- Vehicle Grid -->
 <div class="grid-container">
   <ng-container *ngIf="vehicles$ | async as vehicles">
-    <div *ngFor="let vehicle of vehicles |  keyvalue : vehicleOrder" 
-         class="vehicle-card" 
-         [class.low-battery]="vehicle.value.battery < 30">
+    <div
+      *ngFor="
+        let vehicle of vehicles | keyvalue : vehicleOrder;
+        trackBy: trackByVehicleId
+      "
+      class="vehicle-card"
+      [class.low-battery]="vehicle.value.battery >= 10 && vehicle.value.battery < 30"
+      [class.critical-battery]="vehicle.value.battery < 10"
+
+    >
       <h3>🚗 Vehicle {{ vehicle.value.id }}</h3>
+      <p> ℹ️  Status : {{ vehicle.value.carStatus }}</p>
       <p>🚀 Speed: {{ vehicle.value.speed }} km/h</p>
       <p>🔋 Battery: {{ vehicle.value.battery }}%</p>
       <p>🌡️ Temperature: {{ vehicle.value.temperature }}°C</p>
       <p>⚙️ Tire Pressure: {{ vehicle.value.tirePressure }} PSI</p>
       <p>🔧 Motor Efficiency: {{ vehicle.value.motorEfficiency }}%</p>
-      <p>🔄 Regen Braking: {{ vehicle.value.regenBraking ? 'ON' : 'OFF' }}</p>
+      <p>🔄 Regen Braking: {{ vehicle.value.regenBraking ? "ON" : "OFF" }}</p>
       <p>🛑 Brake Wear: {{ vehicle.value.brakeWear }}%</p>
       <p>⚡ Energy Consumption: {{ vehicle.value.energyConsumption }} kWh</p>
       <p>🛣️ Mileage: {{ vehicle.value.mileage }} km</p>
-      <p>📡 LIDAR: {{ vehicle.value.lidarStatus ? 'ACTIVE' : 'INACTIVE' }}</p>
-      <p>📡 RADAR: {{ vehicle.value.radarStatus ? 'ACTIVE' : 'INACTIVE' }}</p>
-      <p>📷 Camera: {{ vehicle.value.cameraStatus ? 'ACTIVE' : 'INACTIVE' }}</p>
-      <p>🤖 Autopilot: {{ vehicle.value.autopilotMode ? 'ON' : 'OFF' }}</p>
-      <p>📍 Location: Lat {{ vehicle.value.location.lat.toFixed(5) }}, Lng {{ vehicle.value.location.lng.toFixed(5) }}</p>
-      <p class="warning" *ngIf="vehicle.value.battery < 30">⚠️ WARNING: Low Battery!</p>
+      <p>📡 LIDAR: {{ vehicle.value.lidarStatus ? "ACTIVE" : "INACTIVE" }}</p>
+      <p>📡 RADAR: {{ vehicle.value.radarStatus ? "ACTIVE" : "INACTIVE" }}</p>
+      <p>📷 Camera: {{ vehicle.value.cameraStatus ? "ACTIVE" : "INACTIVE" }}</p>
+      <p>🤖 Autopilot: {{ vehicle.value.autopilotMode ? "ON" : "OFF" }}</p>
+      <p>
+        📍 Location: Lat {{ vehicle.value.location.lat.toFixed(5) }}, Lng
+        {{ vehicle.value.location.lng.toFixed(5) }}
+      </p>
+      <p class="warning" *ngIf="vehicle.value.battery < 30 && vehicle.value.battery >= 10">
+        ⚠️ WARNING: Low Battery!
+      </p>
+      <p class="criticalWarning" *ngIf="vehicle.value.battery < 10">
+        ⚠️ WARNING: Critical Battery Level!
+      </p>
+      
     </div>
   </ng-container>
 </div>
