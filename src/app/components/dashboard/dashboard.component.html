@@ -8,12 +8,12 @@
         <map-marker
           [position]="vehicle.value.location"
           [label]="
-            vehicle.value.headingToStation
-              ? '⚡' + vehicle.value.id
+            vehicle.value.carStatus
+              ? '🚗' + vehicle.value.id
               : '🚗 ' + vehicle.value.id
           "
           [icon]="
-            vehicle.value.headingToStation
+            vehicle.value.carStatus
               ? '⚡'
               : '🚗 '
           "
@@ -33,8 +33,9 @@
         trackBy: trackByVehicleId
       "
       class="vehicle-card"
-      [class.low-battery]="vehicle.value.battery >= 10 && vehicle.value.battery < 30"
-      [class.critical-battery]="vehicle.value.battery < 10"
+      [class.low-battery]="vehicle.value.battery >= 10 && vehicle.value.battery < 30 && vehicle.value.carStatus !== 'Charging'"
+      [class.critical-battery]="vehicle.value.battery < 10 && vehicle.value.carStatus !== 'Charging'"
+      [class.chargingBattery]="vehicle.value.carStatus === 'Charging'"
 
     >
       <h3>🚗 Vehicle {{ vehicle.value.id }}</h3>
@@ -56,6 +57,7 @@
         📍 Location: Lat {{ vehicle.value.location.lat.toFixed(5) }}, Lng
         {{ vehicle.value.location.lng.toFixed(5) }}
       </p>
+
       <p class="warning" *ngIf="vehicle.value.battery < 30 && vehicle.value.battery >= 10">
         ⚠️ WARNING: Low Battery!
       </p>

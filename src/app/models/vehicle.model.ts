@@ -13,8 +13,8 @@ export interface Vehicle {
   radarStatus: boolean;             // RADAR sensor status (active/inactive)
   cameraStatus: boolean;            // Camera sensor status (active/inactive)
   autopilotMode: boolean;           // Whether the vehicle is in self-driving mode
-  location: { lat: number; lng: number }; // GPS location
-  headingToStation?: boolean; 
-  carStatus: "Charging"|"Idle"|"Moving";
+  location: { lat: number; lng: number }; // GPS location 
+  carStatus: CarStatusType
   
 }
+export type CarStatusType = "Charging" | "Idle" | "Moving";

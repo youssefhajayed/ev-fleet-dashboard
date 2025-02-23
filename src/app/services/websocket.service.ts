@@ -1,203 +1,171 @@
+// web-socket.service.ts
 import { Injectable } from '@angular/core';
-import { interval, take } from 'rxjs';
+import { interval, map, Subject, switchMap, take, tap } from 'rxjs';
 import { Store } from '@ngrx/store';
-import { updateVehicle, initializeVehicles } from '../state/vehicle.actions';
-import { Vehicle } from '../models/vehicle.model';
+import { initializeVehicles, updateVehicle } from '../state/vehicle.actions';
+import { Vehicle, CarStatusType } from '../models/vehicle.model';
+import { AppState } from '../state/app.state'; // <-- Root AppState interface
+import { selectVehiclesMap } from '../state/vehicle.selectors'
 
 @Injectable({
   providedIn: 'root',
 })
 export class WebSocketService {
-  private vehiclePositions: { [key: number]: { lat: number; lng: number } } = {};
-  private chargingVehicles: Set<number> = new Set(); // Track vehicles currently charging
+  private vehiclePositions: Record<number, { lat: number; lng: number }> = {};
+  private chargingVehicles = new Set<number>(); // Track charging vehicles
   private readonly CHARGING_STATION = { lat: 48.857, lng: 2.351 }; // Charging location
+  private readonly MAX_BATTERY = 100;
+  private readonly SIMULATION_INTERVAL = 2000; // 2 seconds
+  private destroy$ = new Subject<void>(); // ✅ Emits when service is destroyed
 
-  constructor(private store: Store) {
+  // Inject Store<AppState>, not Store<VehicleState>
+  constructor(private store: Store<AppState>) {
     this.initializeVehicles();
     this.startSimulatingData();
   }
 
   private initializeVehicles() {
-    const vehicles: Vehicle[] = [];
+    const vehicles: Vehicle[] = Array.from({ length: 10 }, (_, i) => {
+      const id = i + 1;
+      this.vehiclePositions[id] = this.getRandomPosition();
+      return this.generateVehicle(id);
+    });
 
-    for (let i = 1; i <= 10; i++) {
-      const position = {
-        lat: 48.8566 + Math.random() * 0.01,
-        lng: 2.3522 + Math.random() * 0.01,
-      };
-      this.vehiclePositions[i] = position;
-
-      vehicles.push({
-        id: i,
-        speed: Math.floor(Math.random() * 100),
-        battery: 100, // or use a smaller random: Math.floor(Math.random()*50+50)
-        temperature: Math.floor(Math.random() * (90 - 20 + 1)) + 20,
-        tirePressure: Math.floor(Math.random() * (40 - 30 + 1)) + 30,
-        motorEfficiency: Math.floor(Math.random() * (100 - 70 + 1)) + 70,
-        regenBraking: Math.random() > 0.5,
-        brakeWear: Math.floor(Math.random() * 100),
-        energyConsumption: Math.floor(Math.random() * (20 - 5 + 1)) + 5,
-        mileage: Math.floor(Math.random() * 100000),
-        lidarStatus: Math.random() > 0.1,
-        radarStatus: Math.random() > 0.1,
-        cameraStatus: Math.random() > 0.1,
-        autopilotMode: Math.random() > 0.5,
-        location: position,
-        carStatus: "Moving" 
-      });
-    }
     this.store.dispatch(initializeVehicles({ vehicles }));
   }
 
   private startSimulatingData() {
-    interval(2000).subscribe(() => {
-      this.store
-        .select((state: any) => state.vehicles.vehicles)
-        .pipe(take(1))
-        .subscribe((vehicleMap: { [id: number]: Vehicle }) => {
-          const updatedVehicles: Vehicle[] = [];
-  
-          for (let i = 1; i <= 10; i++) {
-            let position = { ...this.vehiclePositions[i] };
-            const previousVehicle = vehicleMap[i] ?? {
-              battery: 100,
-              speed: 30,
-              mileage: 0,
-            };
-  
-            let newBattery = previousVehicle.battery;
-            let newSpeed = previousVehicle.speed;
-            let headingToStation = previousVehicle.headingToStation || false;
-            let carStatus = previousVehicle.carStatus
-  
-            const isCharging = this.chargingVehicles.has(i);
-  
-            // If battery <= 10 and > 0 => Mark for charging
-            if (newBattery <= 10 && newBattery > 0 && !isCharging) {
-              this.chargingVehicles.add(i);
-              headingToStation = true;
-              console.log(`⚡ Vehicle ${i} heading to charging station...`);
-            }
-  
-            // ---------- 1) If battery 0 => teleport and partial recharge ----------
-            if (newBattery <= 0) {
-              newBattery = 0;
-              newSpeed = 0;
-              this.chargingVehicles.add(i);
-  
-              // Teleport next to station
-              position = this.getLineupPosition(i);
-              headingToStation = false;
-  
-              // Start recharging from 0 => +5
-              newBattery = Math.min(100, newBattery + 10);
-              if (newBattery === 100) {
-                this.chargingVehicles.delete(i);
-                console.log(`✅ Vehicle ${i} instantly recharged from 0%`);
-              } else {
-                console.log(`❌ Vehicle ${i} out of battery, teleported to station`);
-              }
-            }
-            // ---------- 2) If in charging set and battery is between 1–99 ----------
-            else if (isCharging) {
-              // Are we physically at station yet?
-              if (!this.hasReachedChargingStation(position)) {
-                // Move toward station with a small drain
-                // (So they can go from ~10% down to 0% in transit)
-                position = this.moveTowards(position, this.CHARGING_STATION);
-                newSpeed = 10;
-  
-                // Gently drain while en route
-                newBattery = Math.max(
-                  0,
-                  newBattery - (Math.floor(Math.random() * 3) + 1)
-                );
-              } else {
-                // ---------- PHYSICALLY AT STATION => ONLY RECHARGE! ----------
-                newSpeed = 0;
-                carStatus = "Charging";
-                // Do NOT subtract battery if at station
-                newBattery = Math.min(100, newBattery + 5);
-  
-                if (newBattery === 100) {
-                  this.chargingVehicles.delete(i);
-                  headingToStation = false;
-                  position = this.getRandomPosition(i)
-                  console.log(`✅ Vehicle ${i} fully charged at the station`);
-                }
-              }
-            }
-            // ---------- 3) Normal driving & random drain ----------
-            else {
-              position.lat += (Math.random() - 0.5) * 0.0005;
-              position.lng += (Math.random() - 0.5) * 0.0005;
-  
-              // Drain up to 4% each tick for normal driving
-              newBattery = Math.max(
-                0,
-                newBattery - (Math.floor(Math.random() * 20) + 1)
-              );
-            }
-  
-            // Build updated object
-            const updatedVehicle: Vehicle = {
-              ...previousVehicle,
-              speed: newSpeed,
-              battery: Math.floor(newBattery),
-              location: position,
-              headingToStation: headingToStation,
-              carStatus : carStatus
-            };
-  
-            this.vehiclePositions[i] = position;
-            updatedVehicles.push(updatedVehicle);
-            this.store.dispatch(updateVehicle({ vehicle: updatedVehicle }));
-          }
-        });
-    });
+    interval(this.SIMULATION_INTERVAL)
+      .pipe(
+        // Use our typed selector instead of (state: any) => state.vehicles.vehicles
+        switchMap(() =>
+          this.store.select(selectVehiclesMap).pipe(
+            take(1) // only take once each interval
+          )
+        ),
+        map(vehicleMap => {
+          // vehicleMap is now correctly typed as Record<number, Vehicle>
+          return Object.values(vehicleMap).map(vehicle=>
+            this.updateVehicleState(vehicle)
+          );
+        }),
+        tap(updatedVehicles => {
+          updatedVehicles.forEach(vehicle =>
+            this.store.dispatch(updateVehicle({ vehicle }))
+          );
+        })
+      )
+      .subscribe();
   }
 
-  // Line up near station
-  private getLineupPosition(vehicleId: number) {
-    const offset = 0.00005 * (vehicleId - 1);
+  private updateVehicleState(vehicle: Vehicle): Vehicle {
+    let position = { ...this.vehiclePositions[vehicle.id] };
+    let newBattery = vehicle.battery;
+    let newSpeed = vehicle.speed;
+    let carStatus = vehicle.carStatus;
+    const isCharging = this.chargingVehicles.has(vehicle.id);
+
+
+    // 🔋 Charging Logic
+    if (isCharging) {
+      console.log("battery is charging")
+      return this.chargeVehicle(vehicle);
+    }
+
+    // 🛑 Battery 0: Teleport & Charge
+    if (newBattery <= 0) {
+      console.log("battery is < 0")
+      return this.handleBatteryDepleted(vehicle);
+    }
+        // 🚗 Normal Driving & Drain Battery
+    position = this.updatePosition(position);
+    newBattery = this.drainBattery(newBattery);
+    newSpeed = this.getRandomSpeed();
+    carStatus = 'Moving';
+
+    return this.generateVehicle(vehicle.id, newSpeed, newBattery, position, carStatus);
+  }
+
+  private handleBatteryDepleted(vehicle: Vehicle): Vehicle {
+    this.chargingVehicles.add(vehicle.id);
+    return this.generateVehicle(
+      vehicle.id,
+      0,
+      0,
+      this.getLineupPosition(vehicle.id),
+      'Charging'
+    );
+    
+  }
+
+  private chargeVehicle(vehicle: Vehicle): Vehicle {
+    console.log(this.MAX_BATTERY)
+    const newBattery = Math.min(this.MAX_BATTERY, vehicle.battery + 20);
+    let position = this.getLineupPosition(vehicle.id);
+    let carStatus: CarStatusType = 'Charging';
+
+    if (newBattery === this.MAX_BATTERY) {
+      this.chargingVehicles.delete(vehicle.id);
+      position = this.getRandomPosition();
+      carStatus = 'Idle';
+    }
+
+    return this.generateVehicle(vehicle.id, 0, newBattery, position, carStatus);
+  }
+
+  private updatePosition(position: { lat: number; lng: number }): { lat: number; lng: number } {
     return {
-      lat: this.CHARGING_STATION.lat + offset,
+      lat: position.lat + (Math.random() - 0.5) * 0.0005,
+      lng: position.lng + (Math.random() - 0.5) * 0.0005,
+    };
+  }
+
+  private drainBattery(currentBattery: number): number {
+    return Math.max(0, currentBattery - (Math.floor(Math.random() * 20) + 1));
+  }
+
+  private getRandomSpeed(): number {
+    return Math.floor(Math.random() * 100);
+  }
+
+  private getLineupPosition(vehicleId: number): { lat: number; lng: number } {
+    return {
+      lat: this.CHARGING_STATION.lat + 0.00005 * (vehicleId - 1),
       lng: this.CHARGING_STATION.lng,
     };
   }
 
-  private getRandomPosition(vehicleId: number) {
-    // Define how far (in degrees) you allow the car to spawn from your station
-    const maxOffset = 0.01;
-  
-    // Generate random offsets: somewhere between -0.01 and +0.01
-    const latOffset = (Math.random() - 0.5) * 2 * maxOffset;
-    const lngOffset = (Math.random() - 0.5) * 2 * maxOffset;
-  
+  private getRandomPosition(): { lat: number; lng: number } {
     return {
-      // Station is at 48.857, 2.351 by default
-      lat: 48.857 + latOffset,
-      lng: 2.351 + lngOffset,
+      lat: 48.8566 + Math.random() * 0.01,
+      lng: 2.3522 + Math.random() * 0.01,
     };
   }
 
-  private moveTowards(
-    position: { lat: number; lng: number },
-    target: { lat: number; lng: number }
-  ) {
-    const step = 0.0005;
-    const directionLat = target.lat - position.lat;
-    const directionLng = target.lng - position.lng;
-    position.lat += directionLat * step;
-    position.lng += directionLng * step;
-    return position;
-  }
-
-  private hasReachedChargingStation(position: { lat: number; lng: number }) {
-    const distance = Math.sqrt(
-      Math.pow(this.CHARGING_STATION.lat - position.lat, 2) +
-        Math.pow(this.CHARGING_STATION.lng - position.lng, 2)
-    );
-    return distance < 0.001;
+  private generateVehicle(
+    id?: number,
+    newSpeed?: number,
+    newBattery?: number,
+    position?: { lat: number; lng: number },
+    carStatus?: CarStatusType
+  ): Vehicle {
+    return {
+      id: id ?? Math.floor(Math.random() * 10000),
+      speed: newSpeed ?? this.getRandomSpeed(),
+      battery: newBattery ?? this.MAX_BATTERY,
+      temperature: Math.floor(Math.random() * 70) + 20,
+      tirePressure: Math.floor(Math.random() * 10) + 30,
+      motorEfficiency: Math.floor(Math.random() * 31) + 70,
+      regenBraking: Math.random() > 0.5,
+      brakeWear: Math.floor(Math.random() * 100),
+      energyConsumption: Math.floor(Math.random() * 16) + 5,
+      mileage: Math.floor(Math.random() * 100000),
+      lidarStatus: Math.random() > 0.1,
+      radarStatus: Math.random() > 0.1,
+      cameraStatus: Math.random() > 0.1,
+      autopilotMode: Math.random() > 0.5,
+      location: position ?? this.getRandomPosition(),
+      carStatus: carStatus ?? 'Moving',
+    };
   }
 }
